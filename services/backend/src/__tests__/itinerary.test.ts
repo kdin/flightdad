@@ -49,9 +49,10 @@ const validItinerary = {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("POST /flights/itinerary", () => {
-  it("returns 201 and persists the itinerary with an _id", async () => {
+  it("returns 201 and persists the itinerary with an _id, userId, and timeToQuery", async () => {
     const res = await request(app)
       .post("/flights/itinerary")
+      .set("x-user-id", "user-abc")
       .send(validItinerary)
       .expect(201);
 
@@ -59,13 +60,37 @@ describe("POST /flights/itinerary", () => {
     expect(res.body.data).toMatchObject({
       bookingReference: "TESTIT",
       contactEmail: "test@example.com",
+      userId: "user-abc",
       _id: expect.any(String),
     });
+    // timeToQuery is serialised to an ISO string in the JSON response
+    expect(typeof res.body.data.timeToQuery).toBe("string");
+    expect(new Date(res.body.data.timeToQuery).getTime()).not.toBeNaN();
+  });
+
+  it("returns 400 when the x-user-id header is missing", async () => {
+    const res = await request(app)
+      .post("/flights/itinerary")
+      .send(validItinerary)
+      .expect(400);
+
+    expect(res.body.message).toBe("Missing or invalid x-user-id header");
+  });
+
+  it("returns 400 when the x-user-id header is blank", async () => {
+    const res = await request(app)
+      .post("/flights/itinerary")
+      .set("x-user-id", "   ")
+      .send(validItinerary)
+      .expect(400);
+
+    expect(res.body.message).toBe("Missing or invalid x-user-id header");
   });
 
   it("returns 400 when the payload is missing required fields", async () => {
     const res = await request(app)
       .post("/flights/itinerary")
+      .set("x-user-id", "user-abc")
       .send({ bookingReference: "INCOMPLETE" })
       .expect(400);
 
@@ -88,6 +113,7 @@ describe("POST /flights/itinerary", () => {
 
     const res = await request(app)
       .post("/flights/itinerary")
+      .set("x-user-id", "user-abc")
       .send(badItinerary)
       .expect(400);
 
@@ -96,8 +122,14 @@ describe("POST /flights/itinerary", () => {
 
   it("each itinerary is assigned a unique _id", async () => {
     const [res1, res2] = await Promise.all([
-      request(app).post("/flights/itinerary").send(validItinerary),
-      request(app).post("/flights/itinerary").send(validItinerary),
+      request(app)
+        .post("/flights/itinerary")
+        .set("x-user-id", "user-abc")
+        .send(validItinerary),
+      request(app)
+        .post("/flights/itinerary")
+        .set("x-user-id", "user-abc")
+        .send(validItinerary),
     ]);
 
     expect(res1.body.data._id).not.toBe(res2.body.data._id);

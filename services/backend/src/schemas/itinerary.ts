@@ -90,6 +90,32 @@ export const FlightItinerarySchema = z.object({
   paymentMethod: z.string().optional(),
 });
 
+// ─── DB record (stored document shape) ───────────────────────────────────────
+
+/**
+ * Shape of an itinerary document as it is stored in the database.
+ *
+ * Extends the validated POST-body schema with two server-assigned fields:
+ *  - `userId`      — opaque string that uniquely identifies the submitting user.
+ *  - `timeToQuery` — native Date set at insertion time; stored as a real Date
+ *                    object so the database layer can filter / index by time
+ *                    ranges without parsing strings.
+ */
+export const ItineraryRecordSchema = FlightItinerarySchema.extend({
+  /** Uniquely identifies the user who submitted this itinerary. */
+  userId: z.string().min(1),
+
+  /**
+   * Server-assigned timestamp for when this record was stored.
+   * Using a native Date (not an ISO string) enables efficient time-range
+   * queries and optional index creation on the database side.
+   */
+  timeToQuery: z.date(),
+});
+
 // ─── Derived TypeScript types ─────────────────────────────────────────────────
 
 export type FlightItineraryInput = z.infer<typeof FlightItinerarySchema>;
+
+/** The full stored document shape, including server-assigned metadata. */
+export type ItineraryRecord = z.infer<typeof ItineraryRecordSchema>;

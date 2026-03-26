@@ -7,7 +7,7 @@
 import { Router } from "express";
 import db from "../db";
 import { FlightItinerarySchema } from "../schemas/itinerary";
-import type { FlightItineraryInput } from "../schemas/itinerary";
+import type { ItineraryRecord } from "../schemas/itinerary";
 
 const router = Router();
 
@@ -25,9 +25,17 @@ router.get("/", (_req, res) => {
  * POST /flights/itinerary — submit a flight itinerary parsed from a
  * confirmation email.
  *
- * Persists the itinerary to the configured database.
+ * Requires an `x-user-id` header that uniquely identifies the submitting user.
+ * Persists the itinerary to the configured database, adding a `timeToQuery`
+ * timestamp (native Date) for time-range queries.
  */
 router.post("/itinerary", async (req, res) => {
+  const userId = req.headers["x-user-id"];
+  if (typeof userId !== "string" || userId.trim() === "") {
+    res.status(400).json({ message: "Missing or invalid x-user-id header" });
+    return;
+  }
+
   const result = FlightItinerarySchema.safeParse(req.body);
 
   if (!result.success) {
@@ -41,9 +49,15 @@ router.post("/itinerary", async (req, res) => {
     return;
   }
 
+  const record: ItineraryRecord = {
+    ...result.data,
+    userId,
+    timeToQuery: new Date(),
+  };
+
   const itinerary = await db
-    .collection<FlightItineraryInput>("itineraries")
-    .insert(result.data);
+    .collection<ItineraryRecord>("itineraries")
+    .insert(record);
 
   res.status(201).json({ message: "Itinerary received", data: itinerary });
 });
