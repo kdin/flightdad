@@ -64,9 +64,15 @@ describe("POST /flights/itinerary", () => {
       _id: expect.any(String),
       journeyStatus: "PENDING",
     });
-    // timeToQuery is serialised to an ISO string in the JSON response
+    // timeToQuery is serialised to an ISO string in the JSON response and is
+    // exactly 3 hours before the first flight's scheduledDeparture
     expect(typeof res.body.data.timeToQuery).toBe("string");
-    expect(new Date(res.body.data.timeToQuery).getTime()).not.toBeNaN();
+    const expectedTimeToQuery =
+      new Date(validItinerary.flights[0].scheduledDeparture).getTime() -
+      3 * 60 * 60 * 1000;
+    expect(new Date(res.body.data.timeToQuery).getTime()).toBe(
+      expectedTimeToQuery
+    );
   });
 
   it("returns 400 when the x-user-id header is missing", async () => {
