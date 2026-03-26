@@ -49,10 +49,14 @@ router.post("/itinerary", async (req, res) => {
     return;
   }
 
+  // timeToQuery is 3 hours before the first flight's scheduled departure
+  const firstDeparture = new Date(result.data.flights[0].scheduledDeparture);
+  const timeToQuery = new Date(firstDeparture.getTime() - 3 * 60 * 60 * 1000);
+
   const record: ItineraryRecord = {
     ...result.data,
     userId,
-    timeToQuery: new Date(),
+    timeToQuery,
   };
 
   const itinerary = await db
