@@ -62,6 +62,7 @@ describe("POST /flights/itinerary", () => {
       contactEmail: "test@example.com",
       userId: "user-abc",
       _id: expect.any(String),
+      journeyStatus: "PENDING",
     });
     // timeToQuery is serialised to an ISO string in the JSON response and is
     // exactly 3 hours before the first flight's scheduledDeparture
