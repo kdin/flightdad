@@ -1,6 +1,6 @@
 # flightdad ✈️
 
-> A virtual dad that helps you with flight logistics — check-in, status tracking, and notifications.
+> A virtual dad that helps you with flight logistics — check-in, status tracking, notifications, first and last mile.
 
 ---
 
