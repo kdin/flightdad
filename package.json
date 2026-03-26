@@ -1,0 +1,24 @@
+{
+  "name": "flightdad",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A virtual dad that helps you with flight logistics",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "mobile": "npm run start --workspace=apps/mobile",
+    "backend": "npm run dev --workspace=services/backend"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
