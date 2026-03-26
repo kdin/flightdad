@@ -4,8 +4,8 @@
  *       and return a standardised Flight object from @flightdad/shared.
  */
 
-import { Router, Request, Response } from "express";
-import { FlightItinerary } from "@flightdad/shared";
+import { Router } from "express";
+import { FlightItinerarySchema } from "../schemas/itinerary";
 
 const router = Router();
 
@@ -25,30 +25,22 @@ router.get("/", (_req, res) => {
  *
  * TODO: Persist the itinerary to the database.
  */
-router.post("/itinerary", (req: Request, res: Response) => {
-  const body = req.body as FlightItinerary;
-  const missing: string[] = [];
+router.post("/itinerary", (req, res) => {
+  const result = FlightItinerarySchema.safeParse(req.body);
 
-  if (!body.bookingReference) missing.push("bookingReference");
-  if (!body.bookedAt) missing.push("bookedAt");
-  if (!body.contactEmail) missing.push("contactEmail");
-  if (!Array.isArray(body.passengers) || body.passengers.length === 0)
-    missing.push("passengers (must be a non-empty array)");
-  if (!Array.isArray(body.flights) || body.flights.length === 0)
-    missing.push("flights (must be a non-empty array)");
-  if (body.totalPrice === undefined || body.totalPrice === null)
-    missing.push("totalPrice");
-  if (!body.currency) missing.push("currency");
-
-  if (missing.length > 0) {
-    res
-      .status(400)
-      .json({ message: "Missing or invalid required fields", missing });
+  if (!result.success) {
+    res.status(400).json({
+      message: "Invalid itinerary payload",
+      errors: result.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
     return;
   }
 
   // TODO: Post itinerary to database.
-  res.status(201).json({ message: "Itinerary received", data: body });
+  res.status(201).json({ message: "Itinerary received", data: result.data });
 });
 
 export default router;
