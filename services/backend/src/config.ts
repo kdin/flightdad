@@ -66,6 +66,18 @@ const config = {
       tablePrefix: optionalEnv("DYNAMODB_TABLE_PREFIX", "flightdad"),
     },
   },
+
+  worker: {
+    /**
+     * How often (in milliseconds) the worker polls for due itineraries when
+     * running locally.  In production this is controlled by the EventBridge
+     * Scheduler rule, so the value is ignored by the Lambda handler.
+     */
+    pollIntervalMs: parseInt(
+      optionalEnv("WORKER_POLL_INTERVAL_MS", "60000"),
+      10
+    ),
+  },
 } as const;
 
 export type AppConfig = typeof config;

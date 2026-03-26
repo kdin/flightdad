@@ -13,7 +13,8 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "mobile": "npm run start --workspace=apps/mobile",
-    "backend": "npm run dev --workspace=services/backend"
+    "backend": "npm run dev --workspace=services/backend",
+    "worker": "npm run worker --workspace=services/backend"
   },
   "devDependencies": {
     "typescript": "^5.4.5"
