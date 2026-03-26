@@ -38,6 +38,8 @@ export type FlightStatus =
 
 // ─── Itinerary types ──────────────────────────────────────────────────────────
 
+export type JourneyStatus = "PENDING" | "IN-PROGRESS" | "COMPLETED";
+
 export type CabinClass = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST";
 
 export interface BaggageAllowance {
@@ -89,6 +91,8 @@ export interface FlightItinerary {
   /** ISO-4217 currency code (e.g. "USD"). */
   currency: string;
   paymentMethod?: string;
+  /** Current progress of the journey. */
+  journeyStatus: JourneyStatus;
 }
 
 // ─── Check-in types ───────────────────────────────────────────────────────────

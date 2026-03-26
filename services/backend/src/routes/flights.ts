@@ -53,6 +53,7 @@ router.post("/itinerary", async (req, res) => {
     ...result.data,
     userId,
     timeToQuery: new Date(),
+    journeyStatus: "PENDING",
   };
 
   const itinerary = await db

@@ -24,6 +24,12 @@ export const CabinClassSchema = z.enum([
   "FIRST",
 ]);
 
+export const JourneyStatusSchema = z.enum([
+  "PENDING",
+  "IN-PROGRESS",
+  "COMPLETED",
+]);
+
 export const BaggageAllowanceSchema = z.object({
   carryOnPieces: z.number().int().nonnegative(),
   checkedWeightKg: z.number().nonnegative(),
@@ -111,6 +117,9 @@ export const ItineraryRecordSchema = FlightItinerarySchema.extend({
    * queries and optional index creation on the database side.
    */
   timeToQuery: z.date(),
+
+  /** Current progress of the journey. Defaults to PENDING on creation. */
+  journeyStatus: JourneyStatusSchema,
 });
 
 // ─── Derived TypeScript types ─────────────────────────────────────────────────
