@@ -36,6 +36,61 @@ export type FlightStatus =
   | "DELAYED"
   | "DIVERTED";
 
+// ─── Itinerary types ──────────────────────────────────────────────────────────
+
+export type CabinClass = "ECONOMY" | "PREMIUM_ECONOMY" | "BUSINESS" | "FIRST";
+
+export interface BaggageAllowance {
+  /** Number of carry-on pieces allowed. */
+  carryOnPieces: number;
+  /** Checked baggage allowance in kilograms. */
+  checkedWeightKg: number;
+}
+
+export interface Passenger {
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string; // ISO-8601
+  passportNumber?: string;
+  nationality?: string;
+  seatNumber?: string;
+  ticketNumber?: string;
+  frequentFlyerNumber?: string;
+  mealPreference?: string;
+}
+
+export interface ItineraryFlight {
+  flightNumber: string;
+  airline: string;
+  origin: Airport;
+  destination: Airport;
+  scheduledDeparture: string; // ISO-8601
+  scheduledArrival: string; // ISO-8601
+  cabinClass: CabinClass;
+  terminal?: string;
+  gate?: string;
+  aircraft?: string;
+  baggageAllowance?: BaggageAllowance;
+}
+
+/** Payload for POST /flights/itinerary — mirrors a flight confirmation email. */
+export interface FlightItinerary {
+  /** Airline booking reference / confirmation code (e.g. "ABC123"). */
+  bookingReference: string;
+  /** ISO-8601 timestamp of when the ticket was purchased. */
+  bookedAt: string;
+  contactEmail: string;
+  contactPhone?: string;
+  /** One or more passengers travelling on this itinerary. */
+  passengers: Passenger[];
+  /** Ordered list of flight legs in this itinerary. */
+  flights: ItineraryFlight[];
+  totalPrice: number;
+  /** ISO-4217 currency code (e.g. "USD"). */
+  currency: string;
+  paymentMethod?: string;
+}
+
 // ─── Check-in types ───────────────────────────────────────────────────────────
 
 export interface CheckIn {
