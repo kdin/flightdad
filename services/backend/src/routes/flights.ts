@@ -5,7 +5,9 @@
  */
 
 import { Router } from "express";
+import db from "../db";
 import { FlightItinerarySchema } from "../schemas/itinerary";
+import type { FlightItineraryInput } from "../schemas/itinerary";
 
 const router = Router();
 
@@ -23,9 +25,9 @@ router.get("/", (_req, res) => {
  * POST /flights/itinerary — submit a flight itinerary parsed from a
  * confirmation email.
  *
- * TODO: Persist the itinerary to the database.
+ * Persists the itinerary to the configured database.
  */
-router.post("/itinerary", (req, res) => {
+router.post("/itinerary", async (req, res) => {
   const result = FlightItinerarySchema.safeParse(req.body);
 
   if (!result.success) {
@@ -39,8 +41,11 @@ router.post("/itinerary", (req, res) => {
     return;
   }
 
-  // TODO: Post itinerary to database.
-  res.status(201).json({ message: "Itinerary received", data: result.data });
+  const itinerary = await db
+    .collection<FlightItineraryInput>("itineraries")
+    .insert(result.data);
+
+  res.status(201).json({ message: "Itinerary received", data: itinerary });
 });
 
 export default router;
