@@ -8,12 +8,13 @@
  */
 
 import express from "express";
+import config from "./config";
 import flightRoutes from "./routes/flights";
 import checkinRoutes from "./routes/checkin";
 import notificationRoutes from "./routes/notifications";
 
 const app = express();
-const PORT = process.env.PORT ?? 3000;
+const PORT = config.port;
 
 app.use(express.json());
 
@@ -27,8 +28,12 @@ app.use("/flights", flightRoutes);
 app.use("/checkin", checkinRoutes);
 app.use("/notifications", notificationRoutes);
 
-app.listen(PORT, () => {
-  console.log(`flightdad backend listening on port ${PORT}`);
-});
-
 export default app;
+
+// ─── Server start (skipped when imported by tests) ───────────────────────────
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`flightdad backend listening on port ${PORT}`);
+  });
+}
+
