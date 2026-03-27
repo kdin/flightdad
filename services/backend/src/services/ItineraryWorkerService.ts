@@ -1,7 +1,8 @@
 /**
  * ItineraryWorkerService — background worker that scans the itinerary table
  * for records whose `timeToQuery` has passed and whose `journeyStatus` is
- * still PENDING or IN-PROGRESS, then prints them to stdout.
+ * still PENDING or IN-PROGRESS, then forwards the (flightNumber, userId) pairs
+ * to the NotifyService for processing.
  *
  * ─── Local dev ───────────────────────────────────────────────────────────────
  * Call `start(intervalMs)` to kick off a continuous `setInterval` polling
@@ -16,6 +17,7 @@ import defaultDb from "../db";
 import type { DocumentDatabase } from "../db/types";
 import type { Document } from "../db/types";
 import type { ItineraryRecord } from "../schemas/itinerary";
+import { notifyService as defaultNotifyService, NotifyService } from "./NotifyService";
 
 const COLLECTION = "itineraries";
 
@@ -27,14 +29,18 @@ const ACTIVE_STATUSES: ItineraryRecord["journeyStatus"][] = [
 
 export class ItineraryWorkerService {
   private readonly db: DocumentDatabase;
+  private readonly notify: NotifyService;
   private intervalHandle: ReturnType<typeof setInterval> | null = null;
 
   /**
-   * @param database - Optional database to use. Defaults to the app singleton.
-   *                   Inject a fresh `InMemoryDatabase` in tests for isolation.
+   * @param database      - Optional database to use. Defaults to the app singleton.
+   *                        Inject a fresh `InMemoryDatabase` in tests for isolation.
+   * @param notifyService - Optional NotifyService to use. Defaults to the app singleton.
+   *                        Inject a stub in tests to capture notification calls.
    */
-  constructor(database?: DocumentDatabase) {
+  constructor(database?: DocumentDatabase, notifyService?: NotifyService) {
     this.db = database ?? defaultDb;
+    this.notify = notifyService ?? defaultNotifyService;
   }
 
   /**
@@ -83,7 +89,8 @@ export class ItineraryWorkerService {
    * Perform one scan pass:
    *  1. Fetch all PENDING / IN-PROGRESS itineraries from the database.
    *  2. Keep only those whose `timeToQuery` ≤ now.
-   *  3. Print each matching record to stdout as JSON.
+   *  3. Extract (flightNumber, userId) pairs and forward them to the
+   *     NotifyService for processing.
    *
    * Returns the list of due records so callers (tests, Lambda handler) can
    * inspect the results without parsing stdout.
@@ -114,6 +121,17 @@ export class ItineraryWorkerService {
     );
     for (const record of due) {
       console.log(JSON.stringify(record, null, 2));
+    }
+
+    // Extract (flightNumber, userId) pairs from each due record and notify.
+    const pairs = due.flatMap((record) =>
+      record.flights.map((flight) => ({
+        flightNumber: flight.flightNumber,
+        userId: record.userId,
+      }))
+    );
+    if (pairs.length > 0) {
+      this.notify.notify(pairs);
     }
 
     return due;
