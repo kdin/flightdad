@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "worker": "ts-node src/worker.ts",
     "test": "jest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "seed": "ts-node scripts/seed-itineraries.ts"
   },
   "dependencies": {
     "@flightdad/shared": "*",
