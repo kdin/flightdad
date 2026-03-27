@@ -30,10 +30,20 @@ app.use("/notifications", notificationRoutes);
 
 export default app;
 
-// ─── Server start (skipped when imported by tests) ───────────────────────────
+// ─── Server start (skipped when imported by tests or Lambda) ─────────────────
 if (require.main === module) {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`flightdad backend listening on port ${PORT}`);
   });
+
+  // Graceful shutdown.
+  const shutdown = (): void => {
+    server.close(() => process.exit(0));
+    // Force exit if the server doesn't close within 5 seconds.
+    setTimeout(() => process.exit(1), 5_000).unref();
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 

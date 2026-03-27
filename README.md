@@ -53,13 +53,163 @@ TypeScript types consumed by both the mobile app and backend:
 ```bash
 # Install all workspace dependencies
 npm install
-
-# Run the backend (dev mode, listens on http://localhost:3000)
-npm run backend
-
-# Run the mobile app (Expo)
-npm run mobile
 ```
+
+### Set up the backend environment
+
+```bash
+cd services/backend
+
+# Copy the example env file and adjust as needed
+cp .env.example .env.local
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | HTTP port for the local dev server |
+| `DB_TYPE` | `memory` | Database backend (`memory` for local, `dynamodb` for prod) |
+| `WORKER_POLL_INTERVAL_MS` | `60000` | Worker poll interval in milliseconds (local dev only) |
+
+### Run everything locally
+
+In production the HTTP server and background worker run inside the **same Lambda function** (see [Production deployment](#production-deployment-aws--lambda-lith) below). Locally they are two separate processes — start each in its own terminal:
+
+**Terminal 1 — HTTP server**
+
+```bash
+# From the repository root
+npm run backend          # equivalent to: cd services/backend && npm run dev
+```
+
+The server starts on `http://localhost:3000` (or the `PORT` in `.env.local`).
+
+**Terminal 2 — background worker**
+
+```bash
+# From the repository root
+npm run worker           # equivalent to: cd services/backend && npm run worker
+
+# Or override the poll interval (e.g. every 10 s for faster iteration)
+WORKER_POLL_INTERVAL_MS=10000 npm run worker
+```
+
+Press **Ctrl-C** in either terminal to stop that process.
+
+### Run the mobile app
+
+```bash
+npm run mobile           # starts the Expo dev server
+```
+
+### Run tests
+
+```bash
+# All workspaces
+npm test
+
+# Backend only
+cd services/backend && npm test
+```
+
+---
+
+## Background worker
+
+The **itinerary worker** scans the `itineraries` collection for records whose
+`timeToQuery` has passed and whose `journeyStatus` is `PENDING` or
+`IN-PROGRESS`, then prints each matching record to stdout as JSON.
+
+| Environment | How it runs |
+|---|---|
+| **Local dev** | `npm run worker` — a `setInterval` polling loop (`src/worker.ts`) |
+| **Production** | EventBridge Scheduler invokes the same Lambda directly once per minute |
+
+---
+
+## Production deployment (AWS — lambda-lith)
+
+In production the entire backend runs as a single **AWS Lambda function**
+(the "lambda-lith" pattern):
+
+```
+                         ┌─────────────────────────────────┐
+Mobile app ──► API Gateway HTTP API ──► Lambda (dist/lambda.handler)
+                                                  │
+EventBridge Scheduler (rate(1 minute)) ───────────┘
+                                         │
+                              ┌──────────┴──────────┐
+                              │                     │
+                     API Gateway event     Scheduler event
+                              │                     │
+                         Express app        worker.runOnce()
+                              │                     │
+                         DynamoDB            DynamoDB
+```
+
+The same Lambda handles both API requests (via `@vendia/serverless-express`)
+and the scheduled worker tick (via a direct EventBridge invocation).  No
+separate worker Lambda is needed.
+
+**Why lambda-lith?**
+- Pay per request — no idle server cost
+- EventBridge invokes the Lambda directly (no public HTTP surface for the scheduler)
+- Single deployment artifact — one zip, one function
+- CloudWatch Logs captures all `console.log` output automatically
+
+### Deployment steps
+
+1. **Build the backend**
+
+   ```bash
+   cd services/backend
+   npm run build          # compiles TypeScript to dist/
+   ```
+
+2. **Package the Lambda**
+
+   ```bash
+   zip -r backend.zip dist/ node_modules/
+   ```
+
+3. **Create the Lambda function**
+
+   ```bash
+   aws lambda create-function \
+     --function-name flightdad-backend \
+     --runtime nodejs20.x \
+     --handler dist/lambda.handler \
+     --zip-file fileb://backend.zip \
+     --role arn:aws:iam::<ACCOUNT_ID>:role/flightdad-lambda-role \
+     --environment Variables="{NODE_ENV=production,DB_TYPE=dynamodb,AWS_REGION=us-east-1,DYNAMODB_TABLE_PREFIX=flightdad}"
+   ```
+
+4. **Create the API Gateway HTTP API** and connect it to the Lambda function
+   with a `$default` catch-all route using Lambda proxy integration.
+
+5. **Attach an IAM execution role** with:
+   - `dynamodb:Query` and `dynamodb:Scan` on the `flightdad-itineraries` table
+   - `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
+
+6. **Create an EventBridge Scheduler rule** that invokes the Lambda directly
+   with a custom input to trigger the worker:
+
+   ```bash
+   aws scheduler create-schedule \
+     --name flightdad-itinerary-worker-schedule \
+     --schedule-expression "rate(1 minute)" \
+     --flexible-time-window Mode=OFF \
+     --target '{
+       "Arn": "arn:aws:lambda:<REGION>:<ACCOUNT_ID>:function:flightdad-backend",
+       "RoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/flightdad-scheduler-role",
+       "Input": "{\"source\":\"flightdad-scheduler\"}"
+     }'
+   ```
+
+   The `"source": "flightdad-scheduler"` input tells the unified handler to
+   run the worker instead of routing to the Express app.
+
+7. **Monitor** via CloudWatch Logs — all output lands in
+   `/aws/lambda/flightdad-backend`.
 
 ---
 
