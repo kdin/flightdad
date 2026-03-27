@@ -12,6 +12,7 @@ import config from "./config";
 import flightRoutes from "./routes/flights";
 import checkinRoutes from "./routes/checkin";
 import notificationRoutes from "./routes/notifications";
+import notifyRoutes from "./routes/notify";
 
 const app = express();
 const PORT = config.port;
@@ -27,6 +28,7 @@ app.get("/health", (_req, res) => {
 app.use("/flights", flightRoutes);
 app.use("/checkin", checkinRoutes);
 app.use("/notifications", notificationRoutes);
+app.use("/notify", notifyRoutes);
 
 export default app;
 

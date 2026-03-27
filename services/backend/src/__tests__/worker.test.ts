@@ -8,6 +8,7 @@
 
 import { ItineraryWorkerService } from "../services/ItineraryWorkerService";
 import { InMemoryDatabase } from "../db/InMemoryDatabase";
+import { NotifyService } from "../services/NotifyService";
 import type { ItineraryRecord } from "../schemas/itinerary";
 import type { Collection } from "../db/types";
 
@@ -57,12 +58,14 @@ function makeRecord(
 describe("ItineraryWorkerService", () => {
   let db: InMemoryDatabase;
   let collection: Collection<ItineraryRecord>;
+  let notifyServiceInstance: NotifyService;
   let worker: ItineraryWorkerService;
 
   beforeEach(() => {
     db = new InMemoryDatabase();
     collection = db.collection<ItineraryRecord>("itineraries");
-    worker = new ItineraryWorkerService(db);
+    notifyServiceInstance = new NotifyService();
+    worker = new ItineraryWorkerService(db, notifyServiceInstance);
   });
 
   afterEach(() => {
@@ -221,5 +224,67 @@ describe("ItineraryWorkerService", () => {
     expect(spy).toHaveBeenCalledTimes(3);
 
     jest.useRealTimers();
+  });
+
+  // ─── NotifyService integration ───────────────────────────────────────────────
+
+  it("calls NotifyService.notify with (flightNumber, userId) pairs for due records", async () => {
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    const spy = jest.spyOn(notifyServiceInstance, "notify");
+
+    await collection.insert(makeRecord());
+
+    await worker.runOnce();
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith([
+      { flightNumber: "AA100", userId: "user-1" },
+    ]);
+  });
+
+  it("does not call NotifyService.notify when there are no due records", async () => {
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    const spy = jest.spyOn(notifyServiceInstance, "notify");
+
+    await worker.runOnce();
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("passes one pair per flight leg across all due records", async () => {
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    const spy = jest.spyOn(notifyServiceInstance, "notify");
+
+    const multiLeg = makeRecord({
+      userId: "user-multi",
+      flights: [
+        {
+          flightNumber: "AA100",
+          airline: "American Airlines",
+          origin: { iataCode: "JFK", name: "JFK", city: "New York", country: "US" },
+          destination: { iataCode: "ORD", name: "O'Hare", city: "Chicago", country: "US" },
+          scheduledDeparture: "2024-06-01T08:00:00Z",
+          scheduledArrival: "2024-06-01T10:00:00Z",
+          cabinClass: "ECONOMY",
+        },
+        {
+          flightNumber: "AA200",
+          airline: "American Airlines",
+          origin: { iataCode: "ORD", name: "O'Hare", city: "Chicago", country: "US" },
+          destination: { iataCode: "LAX", name: "LAX", city: "Los Angeles", country: "US" },
+          scheduledDeparture: "2024-06-01T12:00:00Z",
+          scheduledArrival: "2024-06-01T14:00:00Z",
+          cabinClass: "ECONOMY",
+        },
+      ],
+    });
+    await collection.insert(multiLeg);
+
+    await worker.runOnce();
+
+    expect(spy).toHaveBeenCalledWith([
+      { flightNumber: "AA100", userId: "user-multi" },
+      { flightNumber: "AA200", userId: "user-multi" },
+    ]);
   });
 });
