@@ -52,50 +52,76 @@ TypeScript types consumed by both the mobile app and backend:
 ```bash
 # Install all workspace dependencies
 npm install
+```
 
-# Run the backend (dev mode)
-npm run backend
+### Set up the backend environment
 
-# Run the mobile app (Expo)
-npm run mobile
+```bash
+cd services/backend
+
+# Copy the example env file and adjust as needed
+cp .env.example .env.local
+```
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | HTTP port for the local dev server |
+| `DB_TYPE` | `memory` | Database backend (`memory` for local, `dynamodb` for prod) |
+| `WORKER_POLL_INTERVAL_MS` | `60000` | Worker poll interval in milliseconds (local dev only) |
+
+### Run everything locally
+
+In production the HTTP server and background worker run inside the **same Lambda function** (see [Production deployment](#production-deployment-aws--lambda-lith) below). Locally they are two separate processes — start each in its own terminal:
+
+**Terminal 1 — HTTP server**
+
+```bash
+# From the repository root
+npm run backend          # equivalent to: cd services/backend && npm run dev
+```
+
+The server starts on `http://localhost:3000` (or the `PORT` in `.env.local`).
+
+**Terminal 2 — background worker**
+
+```bash
+# From the repository root
+npm run worker           # equivalent to: cd services/backend && npm run worker
+
+# Or override the poll interval (e.g. every 10 s for faster iteration)
+WORKER_POLL_INTERVAL_MS=10000 npm run worker
+```
+
+Press **Ctrl-C** in either terminal to stop that process.
+
+### Run the mobile app
+
+```bash
+npm run mobile           # starts the Expo dev server
+```
+
+### Run tests
+
+```bash
+# All workspaces
+npm test
+
+# Backend only
+cd services/backend && npm test
 ```
 
 ---
 
 ## Background worker
 
-The **itinerary worker** is a background process that periodically scans the
-`itineraries` collection for records that are ready to be processed (i.e. whose
-`timeToQuery` timestamp has passed and whose `journeyStatus` is `PENDING` or
-`IN-PROGRESS`) and prints them to stdout.
+The **itinerary worker** scans the `itineraries` collection for records whose
+`timeToQuery` has passed and whose `journeyStatus` is `PENDING` or
+`IN-PROGRESS`, then prints each matching record to stdout as JSON.
 
-### Running the worker locally
-
-The worker runs as a standalone Node.js process with a configurable polling
-loop.
-
-```bash
-# From the repository root
-cd services/backend
-
-# Copy the example env file and adjust as needed
-cp .env.example .env.local
-
-# Start the worker (default poll interval: 60 s)
-npm run worker
-
-# Or override the poll interval (e.g. every 10 s for development)
-WORKER_POLL_INTERVAL_MS=10000 npm run worker
-```
-
-Press **Ctrl-C** to stop the worker cleanly.
-
-#### Environment variables
-
-| Variable                 | Default  | Description                                          |
-|--------------------------|----------|------------------------------------------------------|
-| `WORKER_POLL_INTERVAL_MS`| `60000`  | Poll interval in milliseconds (local dev only).      |
-| `DB_TYPE`                | `memory` | Database backend (`memory` for local, `dynamodb` for prod). |
+| Environment | How it runs |
+|---|---|
+| **Local dev** | `npm run worker` — a `setInterval` polling loop (`src/worker.ts`) |
+| **Production** | EventBridge Scheduler invokes the same Lambda directly once per minute |
 
 ---
 
