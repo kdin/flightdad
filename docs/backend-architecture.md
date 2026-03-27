@@ -85,6 +85,15 @@ API Gateway events never carry a `source` field matching `"flightdad-scheduler"`
 
 ---
 
+## Collections (database tables)
+
+| Collection | Key fields | Description |
+|---|---|---|
+| `itineraries` | `userId`, `journeyStatus`, `timeToQuery` | Flight itineraries submitted by users |
+| `user-friends` | `userId`, `friendIds` | Per-user friend list (userId → list of friend userIds) |
+
+---
+
 ## Background worker — ItineraryWorkerService
 
 `src/services/ItineraryWorkerService.ts` implements the worker logic.

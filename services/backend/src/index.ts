@@ -13,6 +13,7 @@ import flightRoutes from "./routes/flights";
 import checkinRoutes from "./routes/checkin";
 import notificationRoutes from "./routes/notifications";
 import notifyRoutes from "./routes/notify";
+import friendsRoutes from "./routes/friends";
 
 const app = express();
 const PORT = config.port;
@@ -29,6 +30,7 @@ app.use("/flights", flightRoutes);
 app.use("/checkin", checkinRoutes);
 app.use("/notifications", notificationRoutes);
 app.use("/notify", notifyRoutes);
+app.use("/friends", friendsRoutes);
 
 export default app;
 

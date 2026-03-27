@@ -105,6 +105,16 @@ export interface CheckIn {
   checkedInAt: string; // ISO-8601
 }
 
+// ─── User-friends types ───────────────────────────────────────────────────────
+
+/** Represents the friend list for a single user. */
+export interface UserFriends {
+  /** The user whose friend list this document represents. */
+  userId: string;
+  /** Ordered list of friend user IDs. */
+  friendIds: string[];
+}
+
 // ─── Notification types ───────────────────────────────────────────────────────
 
 export type NotificationType =
