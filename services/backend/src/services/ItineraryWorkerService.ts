@@ -49,14 +49,20 @@ export class ItineraryWorkerService {
     if (this.intervalHandle !== null) return; // already running
 
     // Run once immediately, then on each tick.
-    this.runOnce().catch((err) =>
-      console.error("[ItineraryWorker] Error during scan:", err)
-    );
+    void (async (): Promise<void> => {
+      try {
+        await this.runOnce();
+      } catch (err) {
+        console.error("[ItineraryWorker] Error during scan:", err);
+      }
+    })();
 
-    this.intervalHandle = setInterval(() => {
-      this.runOnce().catch((err) =>
-        console.error("[ItineraryWorker] Error during scan:", err)
-      );
+    this.intervalHandle = setInterval(async (): Promise<void> => {
+      try {
+        await this.runOnce();
+      } catch (err) {
+        console.error("[ItineraryWorker] Error during scan:", err);
+      }
     }, intervalMs);
 
     console.log(
