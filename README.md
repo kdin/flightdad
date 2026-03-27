@@ -90,10 +90,6 @@ WORKER_POLL_INTERVAL_MS=10000 npm run worker
 
 Press **Ctrl-C** to stop the worker cleanly.
 
-The worker can also be started alongside the HTTP server — it is automatically
-launched when you run `npm run dev` or `npm start` (when the module is the
-process entry point).
-
 #### Environment variables
 
 | Variable                 | Default  | Description                                          |
@@ -101,24 +97,39 @@ process entry point).
 | `WORKER_POLL_INTERVAL_MS`| `60000`  | Poll interval in milliseconds (local dev only).      |
 | `DB_TYPE`                | `memory` | Database backend (`memory` for local, `dynamodb` for prod). |
 
-### Deploying the worker in production (AWS)
+---
 
-In production the worker runs as an **AWS Lambda function** triggered by an
-**Amazon EventBridge Scheduler** rule.  This is the most cost-effective
-serverless architecture: you pay only for Lambda invocations (typically a few
-milliseconds per run), and EventBridge handles the scheduling reliably without
-needing a long-running process.
+## Production deployment (AWS — lambda-lith)
 
-#### Architecture
+In production the entire backend runs as a single **AWS Lambda function**
+(the "lambda-lith" pattern):
 
 ```
-EventBridge Scheduler
-  └─► Lambda function (src/worker.ts → handler)
-        └─► DynamoDB (itineraries table)
-              └─► CloudWatch Logs (stdout)
+                         ┌─────────────────────────────────┐
+Mobile app ──► API Gateway HTTP API ──► Lambda (dist/lambda.handler)
+                                                  │
+EventBridge Scheduler (rate(1 minute)) ───────────┘
+                                         │
+                              ┌──────────┴──────────┐
+                              │                     │
+                     API Gateway event     Scheduler event
+                              │                     │
+                         Express app        worker.runOnce()
+                              │                     │
+                         DynamoDB            DynamoDB
 ```
 
-#### Deployment steps
+The same Lambda handles both API requests (via `@vendia/serverless-express`)
+and the scheduled worker tick (via a direct EventBridge invocation).  No
+separate worker Lambda is needed.
+
+**Why lambda-lith?**
+- Pay per request — no idle server cost
+- EventBridge invokes the Lambda directly (no public HTTP surface for the scheduler)
+- Single deployment artifact — one zip, one function
+- CloudWatch Logs captures all `console.log` output automatically
+
+### Deployment steps
 
 1. **Build the backend**
 
@@ -129,42 +140,49 @@ EventBridge Scheduler
 
 2. **Package the Lambda**
 
-   Zip the compiled output and its `node_modules`:
-
    ```bash
-   zip -r worker.zip dist/ node_modules/
+   zip -r backend.zip dist/ node_modules/
    ```
 
-3. **Create the Lambda function** (AWS Console or CLI)
+3. **Create the Lambda function**
 
    ```bash
    aws lambda create-function \
-     --function-name flightdad-itinerary-worker \
+     --function-name flightdad-backend \
      --runtime nodejs20.x \
-     --handler dist/worker.handler \
-     --zip-file fileb://worker.zip \
-     --role arn:aws:iam::<ACCOUNT_ID>:role/flightdad-worker-role \
-     --environment Variables="{DB_TYPE=dynamodb,AWS_REGION=us-east-1,DYNAMODB_TABLE_PREFIX=flightdad}"
+     --handler dist/lambda.handler \
+     --zip-file fileb://backend.zip \
+     --role arn:aws:iam::<ACCOUNT_ID>:role/flightdad-lambda-role \
+     --environment Variables="{NODE_ENV=production,DB_TYPE=dynamodb,AWS_REGION=us-east-1,DYNAMODB_TABLE_PREFIX=flightdad}"
    ```
 
-4. **Attach an IAM execution role** with the following permissions:
+4. **Create the API Gateway HTTP API** and connect it to the Lambda function
+   with a `$default` catch-all route using Lambda proxy integration.
+
+5. **Attach an IAM execution role** with:
    - `dynamodb:Query` and `dynamodb:Scan` on the `flightdad-itineraries` table
    - `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
 
-5. **Create an EventBridge Scheduler rule** that triggers the Lambda on a
-   rate or cron schedule:
+6. **Create an EventBridge Scheduler rule** that invokes the Lambda directly
+   with a custom input to trigger the worker:
 
    ```bash
    aws scheduler create-schedule \
      --name flightdad-itinerary-worker-schedule \
      --schedule-expression "rate(1 minute)" \
      --flexible-time-window Mode=OFF \
-     --target '{"Arn":"arn:aws:lambda:<REGION>:<ACCOUNT_ID>:function:flightdad-itinerary-worker","RoleArn":"arn:aws:iam::<ACCOUNT_ID>:role/flightdad-scheduler-role"}'
+     --target '{
+       "Arn": "arn:aws:lambda:<REGION>:<ACCOUNT_ID>:function:flightdad-backend",
+       "RoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/flightdad-scheduler-role",
+       "Input": "{\"source\":\"flightdad-scheduler\"}"
+     }'
    ```
 
-6. **Monitor** the worker via CloudWatch Logs — all `console.log` output from
-   `runOnce()` is automatically captured in the `/aws/lambda/flightdad-itinerary-worker`
-   log group.
+   The `"source": "flightdad-scheduler"` input tells the unified handler to
+   run the worker instead of routing to the Express app.
+
+7. **Monitor** via CloudWatch Logs — all output lands in
+   `/aws/lambda/flightdad-backend`.
 
 ---
 
