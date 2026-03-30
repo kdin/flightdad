@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+build
+*.tsbuildinfo
+
+# Version control
+.git
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+coverage
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Expo / React Native native build artefacts (not needed in backend image)
+apps/mobile/.expo
+apps/mobile/ios/Pods
+apps/mobile/android/.gradle
+apps/mobile/android/app/build
+apps/mobile/android/local.properties
+
+# IDE
+.vscode
+.idea

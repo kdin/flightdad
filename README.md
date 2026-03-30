@@ -48,6 +48,33 @@ TypeScript types consumed by both the mobile app and backend:
 
 ## Getting started
 
+### Option A — Docker (recommended, nothing installed locally)
+
+> **Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Engine and Compose V2)
+
+```bash
+# Start the API server (first run builds the image automatically)
+docker compose up --build
+```
+
+The API is available at `http://localhost:3000`. Source code is bind-mounted into the container so edits are reflected immediately — no rebuild needed.
+
+```bash
+# Also start the background worker
+docker compose --profile worker up --build
+
+# Stop everything
+docker compose down
+```
+
+> **After adding or removing npm dependencies** run `docker compose build` to refresh the image.
+
+Environment variables default to the values in `docker-compose.yml`. Override any of them by creating `services/backend/.env.local` (gitignored) — see `.env.example` for the full list.
+
+---
+
+### Option B — Node.js directly
+
 > **Prerequisites:** Node.js ≥ 18, npm ≥ 9
 
 ```bash
@@ -55,7 +82,7 @@ TypeScript types consumed by both the mobile app and backend:
 npm install
 ```
 
-### Set up the backend environment
+#### Set up the backend environment
 
 ```bash
 cd services/backend
@@ -70,7 +97,7 @@ cp .env.example .env.local
 | `DB_TYPE` | `memory` | Database backend (`memory` for local, `dynamodb` for prod) |
 | `WORKER_POLL_INTERVAL_MS` | `60000` | Worker poll interval in milliseconds (local dev only) |
 
-### Run everything locally
+#### Run everything locally
 
 In production the HTTP server and background worker run inside the **same Lambda function** (see [Production deployment](#production-deployment-aws--lambda-lith) below). Locally they are two separate processes — start each in its own terminal:
 
@@ -95,13 +122,13 @@ WORKER_POLL_INTERVAL_MS=10000 npm run worker
 
 Press **Ctrl-C** in either terminal to stop that process.
 
-### Run the mobile app
+#### Run the mobile app
 
 ```bash
 npm run mobile           # starts the Expo dev server
 ```
 
-### Run tests
+#### Run tests
 
 ```bash
 # All workspaces
@@ -219,12 +246,13 @@ The backend ships with a seed script that posts three sample itineraries
 (domestic, international, and multi-leg) to the running local server.
 
 ```bash
-# 1. Start the backend in one terminal
-npm run backend
+# 1. Start the backend (Docker or Node.js - see Getting started)
+docker compose up --build        # or: npm run backend
 
 # 2. In a second terminal, run the seed script
-cd services/backend
-npm run seed
+docker compose exec backend npm run seed --workspace=services/backend
+# or without Docker:
+cd services/backend && npm run seed
 ```
 
 You can override the target URL with the `API_URL` environment variable:

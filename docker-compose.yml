@@ -1,0 +1,56 @@
+name: flightdad
+
+# ─── Services ──────────────────────────────────────────────────────────────────
+#
+#   docker compose up --build               → API server only
+#   docker compose --profile worker up      → API server + background worker
+#
+# Source code is bind-mounted so edits are picked up without rebuilding.
+# After changing package.json (add/remove deps) run: docker compose build
+# ──────────────────────────────────────────────────────────────────────────────
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
+    volumes:
+      - .:/app
+      # Preserve the container's node_modules — never overwrite with the
+      # (empty) host directory.
+      - node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      DB_TYPE: memory
+      WORKER_POLL_INTERVAL_MS: "60000"
+    # Build packages/shared from source before starting the dev server so
+    # the workspace symlink resolves correctly on a fresh clone.
+    command: >
+      sh -c "npm run build --workspace=packages/shared &&
+             npm run dev --workspace=services/backend"
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    environment:
+      NODE_ENV: development
+      DB_TYPE: memory
+      WORKER_POLL_INTERVAL_MS: "10000"
+    command: >
+      sh -c "npm run build --workspace=packages/shared &&
+             npm run worker --workspace=services/backend"
+    depends_on:
+      - backend
+    profiles:
+      - worker
+
+# ─── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  # Isolates node_modules inside Docker; never touches the host directory.
+  node_modules:
