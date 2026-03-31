@@ -128,6 +128,10 @@ Press **Ctrl-C** in either terminal to stop that process.
 npm run mobile           # starts the Expo dev server
 ```
 
+See **[docs/mobile-local-setup.md](docs/mobile-local-setup.md)** for the full
+guide — including iOS Simulator setup, connecting a physical iPhone, and
+configuring the app to talk to the local backend.
+
 #### Run tests
 
 ```bash
