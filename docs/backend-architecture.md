@@ -100,7 +100,7 @@ API Gateway events never carry a `source` field matching `"flightdad-scheduler"`
 
 | Collection | Key fields | Description |
 |---|---|---|
-| `users` | `userId` | User profile created on first sign-up via Cognito PostConfirmation trigger |
+| `users` | `userId`, `email` | User profile created on first sign-up via Cognito PostConfirmation trigger |
 | `itineraries` | `userId`, `journeyStatus`, `timeToQuery` | Flight itineraries submitted by users |
 | `user-friends` | `userId`, `friendIds` | Per-user friend list (userId → list of friend userIds) |
 
