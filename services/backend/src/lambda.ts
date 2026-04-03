@@ -13,6 +13,12 @@
  *    Gateway — on a cron or rate schedule.  The handler calls
  *    `worker.runOnce()` to scan for due itineraries and then returns.
  *
+ * 3. **Cognito Lambda triggers (e.g. PostConfirmation)**
+ *    Cognito invokes this handler directly after a user confirms sign-up.
+ *    No separate function is required; the handler inspects `triggerSource`
+ *    and performs the appropriate action (e.g. writing the user record to
+ *    DynamoDB).  See docs/federated-auth.md for the full sign-up flow.
+ *
  * ─── Why a single Lambda? ────────────────────────────────────────────────────
  * Running the entire Express backend inside Lambda (behind API Gateway) is
  * known as the "lambda-lith" pattern.  It eliminates idle server cost while
@@ -39,8 +45,10 @@ import type {
   APIGatewayProxyEvent,
   APIGatewayProxyEventV2,
   Context,
+  PostConfirmationTriggerEvent,
 } from "aws-lambda";
 import app from "./index";
+import db from "./db";
 import { ItineraryWorkerService } from "./services/ItineraryWorkerService";
 
 // Build the API Gateway ↔ Express adapter once (reused across warm invocations).
@@ -62,6 +70,7 @@ interface SchedulerEvent {
 
 type LambdaEvent =
   | SchedulerEvent
+  | PostConfirmationTriggerEvent
   | APIGatewayProxyEvent
   | APIGatewayProxyEventV2;
 
@@ -75,9 +84,20 @@ function isSchedulerEvent(event: LambdaEvent): event is SchedulerEvent {
 }
 
 /**
+ * Returns `true` when the event is a Cognito Lambda trigger.
+ * Cognito trigger events always carry a `triggerSource` string field.
+ */
+function isCognitoTrigger(
+  event: LambdaEvent
+): event is PostConfirmationTriggerEvent {
+  return typeof (event as PostConfirmationTriggerEvent).triggerSource === "string";
+}
+
+/**
  * Unified Lambda handler.
  *
  * - EventBridge Scheduler events  → runs the itinerary worker once
+ * - Cognito trigger events         → handles PostConfirmation user creation
  * - API Gateway events             → proxies to the Express app
  */
 export const handler = async (
@@ -87,6 +107,23 @@ export const handler = async (
   if (isSchedulerEvent(event)) {
     await worker.runOnce();
     return { success: true };
+  }
+
+  if (isCognitoTrigger(event)) {
+    // Only write a user record on first-time confirmed sign-up — not on
+    // ForgotPassword confirmation or any other trigger source.
+    if (event.triggerSource === "PostConfirmation_ConfirmSignUp") {
+      const usersCollection = db.collection("users");
+      const { sub, email, name } = event.request.userAttributes;
+      await usersCollection.insert({
+        userId: sub,
+        email,
+        displayName: name ?? email,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    // Cognito requires the original event object to be returned.
+    return event;
   }
 
   // API Gateway v1 or v2 proxy event — forward to Express.
