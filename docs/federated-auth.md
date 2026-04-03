@@ -114,21 +114,30 @@ Mobile app          Cognito            Federated IdP      Lambda trigger       D
    user's first confirmed sign-up. For federated users this fires on the very first
    successful sign-in (because federation implies instant confirmation).
 
+   > **No separate Lambda needed.** Cognito trigger events are invoked directly
+   > (not via API Gateway), exactly like the EventBridge Scheduler events the
+   > existing lambda-lith already handles. The trigger is configured to point at
+   > the same Lambda function; `lambda.ts` adds a dispatch branch for
+   > `PostConfirmationTriggerEvent` alongside the existing EventBridge branch.
+   > See [`src/lambda.ts`](../services/backend/src/lambda.ts).
+
 6. **The Lambda writes a user record to DynamoDB** (the `users` collection). This is
    the canonical moment when the user enters the application database.
 
    ```ts
-   // Pseudo-code for the PostConfirmation trigger Lambda
-   export const handler = async (event: PostConfirmationTriggerEvent) => {
-     const { sub, email, name } = event.request.userAttributes;
-     await usersCollection.insert({
-       userId: sub,       // Cognito sub — used everywhere as the foreign key
-       email,
-       displayName: name ?? email,
-       createdAt: new Date().toISOString(),
-     });
+   // Inside the unified handler in src/lambda.ts
+   if (isCognitoTrigger(event)) {
+     if (event.triggerSource === "PostConfirmation_ConfirmSignUp") {
+       const { sub, email, name } = event.request.userAttributes;
+       await usersCollection.insert({
+         userId: sub,       // Cognito sub — used everywhere as the foreign key
+         email,
+         displayName: name ?? email,
+         createdAt: new Date().toISOString(),
+       });
+     }
      return event; // Cognito requires the event to be returned
-   };
+   }
    ```
 
 7. **Cognito returns the three tokens** (ID, Access, Refresh) to the mobile app.
@@ -322,7 +331,7 @@ Cognito PostConfirmation trigger
     │  event.triggerSource == "PostConfirmation_ConfirmSignUp"  (email/password)
     │  event.triggerSource == "PostConfirmation_ConfirmForgotPassword"  (ignored)
     ▼
-Lambda: createUserRecord
+Lambda (existing lambda-lith): isCognitoTrigger() branch in src/lambda.ts
     │
     │  { userId: event.request.userAttributes.sub,
     │    email:  event.request.userAttributes.email,
@@ -398,7 +407,7 @@ interface User {
 | Cognito User Pool | Email sign-up enabled; Google / Apple configured as federated IdPs |
 | Cognito App Client | "Generate client secret" off (mobile apps cannot keep secrets); Allowed flows: `ALLOW_USER_SRP_AUTH`, `ALLOW_REFRESH_TOKEN_AUTH` |
 | Cognito Hosted UI | Required for federated (OAuth 2.0 PKCE) flows; custom domain optional |
-| PostConfirmation Lambda | Triggered by `PostConfirmation_ConfirmSignUp`; IAM role with `dynamodb:PutItem` on `users` table |
+| PostConfirmation trigger config | Point the trigger at the **existing backend Lambda** (no separate function); configure `PostConfirmation_ConfirmSignUp`; IAM execution role needs `dynamodb:PutItem` on `users` table |
 | Lambda env vars | `COGNITO_USER_POOL_ID`, `COGNITO_APP_CLIENT_ID` (also needed by the backend) |
 | IAM execution role (backend Lambda) | No Cognito API calls are needed — the backend only validates JWTs using JWKS; no extra IAM permissions required |
 
