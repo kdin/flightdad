@@ -95,6 +95,21 @@ export interface FlightItinerary {
   journeyStatus: JourneyStatus;
 }
 
+/**
+ * Extended flight status returned by GET /flights/:flightNumber.
+ * Includes real-time ETA and delay information from the flight data provider.
+ */
+export interface FlightStatusInfo extends Flight {
+  /** Estimated departure time (ISO-8601), or null if not yet available. */
+  estimatedDeparture: string | null;
+  /** Estimated arrival time / ETA (ISO-8601), or null if not yet available. */
+  estimatedArrival: string | null;
+  /** Departure delay in minutes (positive = late), or null if not reported. */
+  departureDelayMinutes: number | null;
+  /** Arrival delay in minutes (positive = late), or null if not reported. */
+  arrivalDelayMinutes: number | null;
+}
+
 // ─── Check-in types ───────────────────────────────────────────────────────────
 
 export interface CheckIn {

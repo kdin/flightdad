@@ -1,19 +1,34 @@
 /**
  * Flight routes.
- * TODO: Implement each handler — query a flight data provider, cache results,
- *       and return a standardised Flight object from @flightdad/shared.
  */
 
 import { Router } from "express";
 import db from "../db";
 import { FlightItinerarySchema } from "../schemas/itinerary";
 import type { ItineraryRecord } from "../schemas/itinerary";
+import { flightStatusService } from "../services/FlightStatusService";
 
 const router = Router();
 
 /** GET /flights/:flightNumber — retrieve current status for a flight. */
-router.get("/:flightNumber", (_req, res) => {
-  res.status(501).json({ message: "Not implemented" });
+router.get("/:flightNumber", async (req, res) => {
+  const { flightNumber } = req.params;
+
+  try {
+    const status = await flightStatusService.getFlightStatus(flightNumber);
+
+    if (status === null) {
+      res.status(404).json({ message: `Flight ${flightNumber} not found` });
+      return;
+    }
+
+    res.json({ data: status });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res
+      .status(502)
+      .json({ message: "Failed to retrieve flight status", error: message });
+  }
 });
 
 /** GET /flights — list all tracked flights for the authenticated user. */

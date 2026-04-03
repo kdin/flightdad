@@ -94,6 +94,42 @@ API Gateway events never carry a `source` field matching `"flightdad-scheduler"`
 
 ---
 
+## Flight data provider — AviationStack
+
+The `GET /flights/:flightNumber` endpoint retrieves live flight status from the
+[AviationStack REST API](https://aviationstack.com).
+
+### Data returned
+
+- **ETA** — `estimatedDeparture` and `estimatedArrival` (ISO-8601 timestamps)
+- **Delay** — `departureDelayMinutes` and `arrivalDelayMinutes` (positive integer = late)
+- **Status** — normalised to the shared `FlightStatus` enum (see table below)
+
+### Status mapping
+
+| AviationStack `flight_status` | flightdad `FlightStatus` |
+|---|---|
+| `scheduled` | `SCHEDULED` |
+| `active` | `IN_FLIGHT` (overridden to `DELAYED` when delay > 0) |
+| `landed` | `LANDED` |
+| `cancelled` | `CANCELLED` |
+| `diverted` / `incident` | `DIVERTED` |
+
+### Configuration
+
+Set `AVIATIONSTACK_API_KEY` in the environment (blank by default).
+See [docs/flight-tracker-api.md](./flight-tracker-api.md) for full setup instructions.
+
+### Source files
+
+| File | Role |
+|---|---|
+| `src/clients/aviationstack.ts` | Typed HTTP client; wraps a single `GET /v1/flights` call |
+| `src/services/FlightStatusService.ts` | Business logic; maps raw API response to `FlightStatusInfo` |
+| `src/routes/flights.ts` | Route handler; calls `flightStatusService.getFlightStatus()` |
+
+---
+
 ## Background worker — ItineraryWorkerService
 
 `src/services/ItineraryWorkerService.ts` implements the worker logic.

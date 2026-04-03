@@ -78,6 +78,16 @@ const config = {
       10
     ),
   },
+
+  aviationstack: {
+    /**
+     * AviationStack API access key.
+     * Obtain one at https://aviationstack.com — the free plan is sufficient
+     * for initial testing (100 live requests / month).
+     * Set via the AVIATIONSTACK_API_KEY environment variable.
+     */
+    apiKey: optionalEnv("AVIATIONSTACK_API_KEY", ""),
+  },
 } as const;
 
 export type AppConfig = typeof config;
