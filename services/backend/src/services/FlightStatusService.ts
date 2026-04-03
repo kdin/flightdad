@@ -84,6 +84,11 @@ export class FlightStatusService {
       airline: raw.airline.name,
       origin: {
         iataCode: raw.departure.iata,
+        // AviationStack /v1/flights only returns the full airport name, not a
+        // separate city or country field.  City falls back to the airport name;
+        // country is left blank.  A richer airport dataset (e.g. from the
+        // AviationStack /airports endpoint or a static IATA lookup) would be
+        // needed to populate these fields accurately.
         name: raw.departure.airport,
         city: raw.departure.airport,
         country: "",

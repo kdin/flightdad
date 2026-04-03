@@ -7,7 +7,7 @@ in the flightdad backend.
 
 | Criteria | AviationStack |
 |---|---|
-| **Adoption** | 100 000+ developers; used widely in travel / flight apps |
+| **Adoption** | 100,000+ developers; used widely in travel / flight apps |
 | **Free tier** | ✅ 100 real-time API calls / month; unlimited historical |
 | **Data quality** | Aggregates from IATA, ICAO, and global airline feeds |
 | **ETA / delay** | ✅ `departure.estimated`, `arrival.estimated`, `departure.delay`, `arrival.delay` (minutes) |
