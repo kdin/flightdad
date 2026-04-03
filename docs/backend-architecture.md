@@ -11,6 +11,7 @@ The `services/backend` service is a Node.js / Express REST API. In production it
 ```
 Mobile app
     │
+    │  Authorization: Bearer <Cognito ID token>
     ▼
 API Gateway HTTP API
     │
@@ -18,13 +19,23 @@ API Gateway HTTP API
 Lambda  (dist/lambda.handler)
     │
     ├─── API Gateway event ──► @vendia/serverless-express ──► Express app ──► DynamoDB
+    │                                                              │
+    │                                                   requireAuth middleware
+    │                                                   (JWT validation via JWKS)
     │
     └─── EventBridge Scheduler event ──► ItineraryWorkerService.runOnce() ──► DynamoDB
 
 EventBridge Scheduler (rate(1 minute))
     │
     └──► Lambda (direct invocation, no API Gateway)
+
+AWS Cognito User Pool
+    │
+    └──► PostConfirmation trigger ──► Lambda ──► DynamoDB (users collection)
 ```
+
+See [docs/federated-auth.md](./federated-auth.md) for the full authentication and
+user-creation flow.
 
 ---
 
@@ -89,8 +100,12 @@ API Gateway events never carry a `source` field matching `"flightdad-scheduler"`
 
 | Collection | Key fields | Description |
 |---|---|---|
+| `users` | `userId` | User profile created on first sign-up via Cognito PostConfirmation trigger |
 | `itineraries` | `userId`, `journeyStatus`, `timeToQuery` | Flight itineraries submitted by users |
 | `user-friends` | `userId`, `friendIds` | Per-user friend list (userId → list of friend userIds) |
+
+`userId` in every collection is the Cognito `sub` claim — a stable UUID that never
+changes. See [docs/federated-auth.md](./federated-auth.md) for details.
 
 ---
 
